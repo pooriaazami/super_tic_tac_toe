@@ -19,7 +19,6 @@ from matplotlib import font_manager
 
 load_dotenv()
 
-BASE_FONT = os.environ['BASE_FONT']
 def get_pillow_font(font_size, font_weight=None):
     if font_weight:
         font = font_manager.FontProperties(family=BASE_FONT, weight=font_weight)
@@ -38,6 +37,7 @@ FRAME_SIZE = BOARD_EDGE * BOARD_SIZE
 MARGIN = int(os.environ['MARGIN'])
 
 
+BASE_FONT = os.environ['BASE_FONT']
 SMALL_FONT = {
     'canvas': ' '.join([BASE_FONT, os.environ['SMALL_FONT_SIZE']]),
     'pillow': get_pillow_font(os.environ['SMALL_FONT_SIZE'])
