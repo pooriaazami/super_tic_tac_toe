@@ -1,9 +1,9 @@
 import os
 import sys
 import time
+import logging
 import subprocess
 from threading import Timer
-import logging
 
 import argparse
 from dotenv import load_dotenv
@@ -361,7 +361,7 @@ def run_game(board):
         logger.debug('Exporting the map')
         export_map(board)
 
-        logger.debug('Ecporting the state')
+        logger.debug('Exporting the state')
         export_state(board)
 
         logger.debug('Running the agents')
