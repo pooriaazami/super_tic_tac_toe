@@ -13,7 +13,21 @@ import numpy as np
 from tkinter import *
 from tkinter.ttk import *
 
+import cv2
+from PIL import Image, ImageDraw, ImageFont
+from matplotlib import font_manager
+
 load_dotenv()
+
+BASE_FONT = os.environ['BASE_FONT']
+def get_pillow_font(font_size, font_weight=None):
+    if font_weight:
+        font = font_manager.FontProperties(family=BASE_FONT, weight=font_weight)
+    else:
+        font = font_manager.FontProperties(family=BASE_FONT)
+
+    file = font_manager.findfont(font)
+    return ImageFont.truetype(file, int(font_size))
 
 MAP_EXPORT_FILE = os.environ['MAP_EXPORT_FILE']
 STATE_EXPORT_FILE = os.environ['STATE_EXPORT_FILE']
@@ -23,10 +37,21 @@ BOARD_EDGE = int(os.environ['BOARD_EDGE'])
 FRAME_SIZE = BOARD_EDGE * BOARD_SIZE
 MARGIN = int(os.environ['MARGIN'])
 
-BASE_FONT = os.environ['BASE_FONT']
-SMALL_FONT = ' '.join([BASE_FONT, os.environ['SMALL_FONT_SIZE']])
-LARGE_FONT = ' '.join([BASE_FONT, os.environ['LARGE_FONT_SIZE'], 'bold'])
-EXTRA_LARGE_FONT = ' '.join([BASE_FONT, os.environ['EXTRA_LARGE_FONT_SIZE'], 'bold'])
+
+SMALL_FONT = {
+    'canvas': ' '.join([BASE_FONT, os.environ['SMALL_FONT_SIZE']]),
+    'pillow': get_pillow_font(os.environ['SMALL_FONT_SIZE'])
+}
+
+LARGE_FONT = {
+    'canvas': ' '.join([BASE_FONT, os.environ['LARGE_FONT_SIZE'], 'bold']),
+    'pillow': get_pillow_font(os.environ['LARGE_FONT_SIZE'], 'bold')
+}
+
+EXTRA_LARGE_FONT = {
+    'canvas':' '.join([BASE_FONT, os.environ['EXTRA_LARGE_FONT_SIZE'], 'bold']),
+    'pillow': get_pillow_font(os.environ['EXTRA_LARGE_FONT_SIZE'], 'bold')
+}
 
 TIME_OUT = int(os.environ['TIME_OUT'])
 MOVE_EXPORT_FILE = os.environ['MOVE_EXPORT_FILE']
@@ -42,27 +67,82 @@ root.iconphoto(False, icon)
 canvas = Canvas(root, bg=os.environ['BACKGROUP_COLOR'], width=WINDOW_SIZE, height=WINDOW_SIZE)
 
 logger = None
+record = False
 
-def draw_main_board():
-    for j in range(1, BOARD_SIZE):
-        for i in range(BOARD_SIZE):
-            canvas.create_line(MARGIN * j * 2 + FRAME_SIZE * j, MARGIN * (2 * i + 1) + FRAME_SIZE * i,
-                            MARGIN * j * 2 + FRAME_SIZE * j, MARGIN * (2 * i + 1) + FRAME_SIZE * (i + 1), fill=os.environ['BORDER_COLOR'])
+class Screen:
+    def __init__(self, canvas):
+        self.__canvas = canvas
+        self.__img = Image.new('RGB', (WINDOW_SIZE, WINDOW_SIZE), os.environ['BACKGROUP_COLOR'])
+        self.__img_draw = ImageDraw.Draw(self.__img)
+        self.__counter = 0
+        self.__output_folder = '.\\screenshots'
+
+        self.draw_main_board()        
+        for i in range(BOARD_SIZE ** 2):
+            self.drwa_cell_board(i)
+
+        try:
+            record and os.mkdir(self.__output_folder)
+        except:
+            logger.error(f'There was an error while creating foler the {self.__output_folder}')
+            sys.exit(1)
+
+    def draw_line(self, start_x, start_y, end_x, end_y, fill):
+        self.__canvas.create_line(start_x, start_y, end_x, end_y, fill=fill)
+        record and self.__img_draw.line([start_x, start_y, end_x, end_y], fill)
+
+    
+    def draw_rectangle(self, start_x, start_y, end_x, end_y, fill, outline):
+        self.__canvas.create_rectangle(start_x, start_y, end_x, end_y, fill=fill, outline=outline)
+        record and self.__img_draw.rectangle([start_x, start_y, end_x, end_y], fill=fill, outline=outline)
+
+    def draw_text(self, start_x, start_y, text, fill, font):
+        self.__canvas.create_text(start_x, start_y, text=text, fill=fill, font=font['canvas'])
+        record and self.__img_draw.text([start_x, start_y], text, fill=fill, font=font['pillow'], anchor='mm')
+
+    def draw_main_board(self):
+        for j in range(1, BOARD_SIZE):
+            for i in range(BOARD_SIZE):
+                self.draw_line(MARGIN * j * 2 + FRAME_SIZE * j, MARGIN * (2 * i + 1) + FRAME_SIZE * i,
+                                MARGIN * j * 2 + FRAME_SIZE * j, MARGIN * (2 * i + 1) + FRAME_SIZE * (i + 1), fill=os.environ['BORDER_COLOR'])
+                
+                self.draw_line(MARGIN * (2 * i + 1) + FRAME_SIZE * i, MARGIN * j * 2 + FRAME_SIZE * j,
+                                MARGIN * (2 * i + 1) + FRAME_SIZE * (i + 1),MARGIN * j * 2 + FRAME_SIZE * j, fill=os.environ['BORDER_COLOR'])
+
+    def drwa_cell_board(self, idx):
+        y, x = divmod(idx, BOARD_SIZE)
+        start_x = MARGIN * (x * 2 + 1) + FRAME_SIZE * x
+        start_y = MARGIN * (y * 2 + 1) + FRAME_SIZE * y
+
+        for i in range(1, BOARD_SIZE):
+            self.draw_line(start_x + BOARD_EDGE * i, start_y, 
+                    start_x + BOARD_EDGE * i, start_y + FRAME_SIZE, fill=os.environ['CELL_COLOR'])
+
+            self.draw_line(start_x, start_y + BOARD_EDGE * i, 
+                    start_x + FRAME_SIZE, start_y + BOARD_EDGE * i, fill=os.environ['CELL_COLOR'])
             
-            canvas.create_line(MARGIN * (2 * i + 1) + FRAME_SIZE * i, MARGIN * j * 2 + FRAME_SIZE * j,
-                            MARGIN * (2 * i + 1) + FRAME_SIZE * (i + 1),MARGIN * j * 2 + FRAME_SIZE * j, fill=os.environ['BORDER_COLOR'])
+    def save(self):
+        record and self.__img.save(f'{self.__output_folder}\\{self.__counter}.png')
+        self.__counter += 1
 
-def drwa_cell_board(idx):
-    y, x = divmod(idx, BOARD_SIZE)
-    start_x = MARGIN * (x * 2 + 1) + FRAME_SIZE * x
-    start_y = MARGIN * (y * 2 + 1) + FRAME_SIZE * y
+    def __build_video(self):
+        name = int(time.time() * 100)
+        video = cv2.VideoWriter(f'{name}.avi', cv2.VideoWriter_fourcc(*'DIVX'), 60, (WINDOW_SIZE, WINDOW_SIZE))
 
-    for i in range(1, BOARD_SIZE):
-        canvas.create_line(start_x + BOARD_EDGE * i, start_y, 
-                   start_x + BOARD_EDGE * i, start_y + FRAME_SIZE, fill=os.environ['CELL_COLOR'])
+        for i in range(0, self.__counter):
+            img_path = f'{self.__output_folder}\\{i}.png'
+            frame = cv2.imread(img_path)
+            for i in range(30):
+                video.write(frame)
 
-        canvas.create_line(start_x, start_y + BOARD_EDGE * i, 
-                   start_x + FRAME_SIZE, start_y + BOARD_EDGE * i, fill=os.environ['CELL_COLOR'])
+            os.remove(img_path)
+        
+        video.release()
+
+    def build(self):
+        record and self.__build_video()
+        record and os.rmdir(self.__output_folder)
+
 
 class Move:
     def __init__(self, char, value, color):
@@ -121,11 +201,13 @@ def check_win(board):
         return NOT_DONE_YET
 
 class MiniBoard:
-    def __init__(self, board_idx):
+    def __init__(self, board_idx, screen):
         self.__board = np.zeros((BOARD_SIZE, BOARD_SIZE))
         self.__board_y, self.__board_x = divmod(board_idx, BOARD_SIZE)
         self.__board_start_x = MARGIN * (self.__board_x * 2 + 1) + FRAME_SIZE * self.__board_x
         self.__board_start_y = MARGIN * (self.__board_y * 2 + 1) + FRAME_SIZE * self.__board_y
+
+        self.__screen = screen
         self.__filled = 0
 
     def move(self, idx, move):
@@ -138,7 +220,7 @@ class MiniBoard:
         start_x = self.__board_start_x  + cell_x * BOARD_EDGE + int(BOARD_EDGE * .5)
         start_y = self.__board_start_y + cell_y * BOARD_EDGE + int(BOARD_EDGE * .5)
 
-        canvas.create_text(start_x, start_y, text=move.text, fill=move.color, font=SMALL_FONT)
+        self.__screen.draw_text(start_x, start_y, text=move.text, fill=move.color, font=SMALL_FONT)
 
     def fill_board(self, move):
         cell_y, cell_x = divmod(BOARD_SIZE ** 2 // 2, BOARD_SIZE)
@@ -146,9 +228,9 @@ class MiniBoard:
         start_x = MARGIN * (self.__board_x * 2 + 1) + FRAME_SIZE * self.__board_x + cell_x * BOARD_EDGE + int(BOARD_EDGE * .5)
         start_y = MARGIN * (self.__board_y * 2 + 1) + FRAME_SIZE * self.__board_y + cell_y * BOARD_EDGE + int(BOARD_EDGE * .5)
 
-        canvas.create_rectangle(self.__board_start_x, self.__board_start_y,
+        self.__screen.draw_rectangle(self.__board_start_x, self.__board_start_y,
                                  self.__board_start_x + FRAME_SIZE, self.__board_start_y + FRAME_SIZE, fill=os.environ['BACKGROUP_COLOR'], outline=os.environ['BACKGROUP_COLOR'])
-        canvas.create_text(start_x, start_y, text=move.text, fill=move.color, font=LARGE_FONT)
+        self.__screen.draw_text(start_x, start_y, text=move.text, fill=move.color, font=LARGE_FONT)
 
     @property
     def board(self):
@@ -159,11 +241,10 @@ class MiniBoard:
                 
 class Board:
     def __init__(self):
-        self.__cells = [MiniBoard(i) for i in range(BOARD_SIZE ** 2)]
+        self.__screen = Screen(canvas)
+        self.__screen.save()
+        self.__cells = [MiniBoard(i, self.__screen) for i in range(BOARD_SIZE ** 2)]
         self.__board = np.zeros((BOARD_SIZE, BOARD_SIZE))
-        draw_main_board()        
-        for i in range(BOARD_SIZE ** 2):
-            drwa_cell_board(i)
 
         self.__available_boards = 2 ** BOARD_SIZE ** 2  - 1
         self.__board_binaies = [self.__available_boards ^ (1 << i) for i in range(BOARD_SIZE ** 2)]
@@ -198,8 +279,10 @@ class Board:
             text_x, text_y = WINDOW_SIZE // 2, WINDOW_SIZE // 2
 
             self.__done = move.value
-            canvas.create_rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE, fill=os.environ['BACKGROUP_COLOR'], outline=os.environ['BACKGROUP_COLOR'])
-            canvas.create_text(text_x, text_y, text=move.text, fill=move.color, font=EXTRA_LARGE_FONT)
+            self.__screen.draw_rectangle(0, 0, WINDOW_SIZE, WINDOW_SIZE, fill=os.environ['BACKGROUP_COLOR'], outline=os.environ['BACKGROUP_COLOR'])
+            self.__screen.draw_text(text_x, text_y, text=move.text, fill=move.color, font=EXTRA_LARGE_FONT)
+            self.__screen.save()
+            self.__screen.build()
     
     def __is_move_valid(self, board_idx, cell_idx):
         y, x = divmod(cell_idx, BOARD_SIZE)
@@ -220,9 +303,14 @@ class Board:
         self.__last_board_idx = cell_idx
 
         time.sleep(SLEEP_TIME)
+        self.__screen.save()
         root.update()
 
-        self.__check_win(board_idx, win_state, X) or self.__check_win(board_idx, win_state, O)
+        if self.__check_win(board_idx, win_state, X) or self.__check_win(board_idx, win_state, O):
+            time.sleep(SLEEP_TIME)
+            self.__screen.save()
+            root.update()
+            
         board_win_state = check_win(self.__board)
         self.__announce_win(board_win_state, X) or self.__announce_win(board_win_state, O)
 
@@ -386,17 +474,16 @@ def parse_args():
     parser.add_argument('-r', '--run', help='use this flag to run players and see the result', action = 'store_true', required=False)
     parser.add_argument('-l', '--log', help='use this flag to log the game in a log file', action='store_true', required=False)
     parser.add_argument('-v', '--verbose', help='use this flag to log the game board after each move', action='store_true', required=False)
-    parser.add_argument('-d', '--dir', help='specifies the loggers output directory', action='store', nargs=1)
+    parser.add_argument('-d', '--dir', help='specifies the loggers output directory', action='store', nargs=1, required=False)
+    parser.add_argument('-s', '--save', help='records the screen while the game is played', action='store_true', required=False)
 
     args = parser.parse_args(sys.argv[1:])
     return args
 
 def main():
     global logger
+    global record
     args = parse_args()
-    
-    board = Board()
-    canvas.pack()
     
     level = logging.DEBUG if args.verbose else logging.INFO
     log_root = args.dir[0] if args.dir else '.\\'
@@ -407,7 +494,11 @@ def main():
         logging.basicConfig(level=level)
 
     logger = logging.getLogger('Server')
+    record = True if args.save else False
 
+    board = Board()
+    canvas.pack()
+    
     if args.test:
         logger.debug('Test mode is activated')
         run_test(board)
@@ -416,7 +507,7 @@ def main():
         
         run_game(board)
     
-    mainloop()
+    not record and mainloop()
 
 if __name__ == '__main__':
     main()
