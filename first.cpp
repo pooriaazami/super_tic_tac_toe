@@ -75,27 +75,23 @@ void move()
 
     // Sample code
     int lim = BOARD_SIZE * BOARD_SIZE;
-    bool done = false;
     for (int t = 0; t < lim; t++)
     {
-        if (done)
-            break;
-        if (boards[t] == 1)
+        if (boards[t]) // boards[t] == true
         {
             for (int i = 0; i < BOARD_SIZE; i++)
             {
-                if (done)
-                    break;
                 for (int j = 0; j < BOARD_SIZE; j++)
                 {
-                    if (cells[t].board[i][j] == 0)
+                    if (cells[t].board[i][j] == EMPTY_CELL)
                     {
                         int cell_idx = i * BOARD_SIZE + j;
 
                         chosen_board_idx = t;
                         chosen_cell_idx = cell_idx;
-                        done = true;
-                        break;
+
+                        export_move(chosen_board_idx, chosen_cell_idx);
+                        return;
                     }
                 }
             }
@@ -103,8 +99,6 @@ void move()
     }
 
     // End yout code here
-
-    export_move(chosen_board_idx, chosen_cell_idx);
 }
 
 int main()

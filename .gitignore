@@ -2,9 +2,16 @@ Include/
 Lib/
 Scripts/
 share/
+screenshots/
 pyvenv.cfg
 
 *.zip
 *.exe
 *.log
-log/
+*/*.log
+
+map.txt
+state.txt
+move.txt
+*.avi
+*.log
