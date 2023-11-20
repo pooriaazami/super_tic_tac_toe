@@ -175,6 +175,8 @@ O = Move(os.environ['SECOND_PLAYER_CHAR']
 TIE = 2
 NOT_DONE_YET = -2
 
+EMPTY_CELL = 0
+
 def check_win(board):
     filled = np.sum(board != 0)
     row_sum = board.sum(axis=1)
@@ -356,7 +358,9 @@ class Board:
             moves = self.__available_boards
         else:
             y, x = divmod(self.__last_board_idx, BOARD_SIZE)
-            if self.__board[y, x] != 0:
+            if not any(self.__board[y] == EMPTY_CELL):
+                moves = self.__available_boards
+            elif self.__board[y, x] != 0:
                 moves = self.__available_boards
             else:
                 moves = 1 << self.__last_board_idx
